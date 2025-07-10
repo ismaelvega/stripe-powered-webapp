@@ -1,0 +1,210 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Trash2, Star } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { showErrorAlert, showToast, showConfirmDialog } from '@/lib/sweetalert';
+
+interface PaymentMethod {
+  id: string;
+  stripe_payment_method_id: string;
+  card_brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  is_default: boolean;
+  created_at: string;
+}
+
+export default function PaymentMethodsList() {
+  const { user } = useAuth();
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      fetchPaymentMethods();
+    }
+  }, [user]);
+
+  const fetchPaymentMethods = async () => {
+    // console.log(user)
+    try {
+      const { data, error } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+    //   console.log('data', data);
+      setPaymentMethods(data || []); // we store the fetched payment methods or an empty array if no results
+    } catch (error: any) {
+      console.error('Error fetching payment methods:', error);
+      await showErrorAlert('Error', 'No se pudieron cargar los métodos de pago');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePaymentMethod = async (paymentMethod: PaymentMethod) => {
+    const confirmed = await showConfirmDialog(
+      '¿Eliminar método de pago?',
+      `¿Estás seguro de que quieres eliminar la tarjeta terminada en ${paymentMethod.last4}?`,
+      'Eliminar',
+      'Cancelar'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('payment_methods')
+        .delete()
+        .eq('id', paymentMethod.id);
+
+      if (error) throw error;
+
+      setPaymentMethods(prev => prev.filter(pm => pm.id !== paymentMethod.id));
+      await showToast('Método de pago eliminado', 'success');
+    } catch (error: any) {
+      console.error('Error deleting payment method:', error);
+      await showErrorAlert('Error', 'No se pudo eliminar el método de pago');
+    }
+  };
+
+  const handleSetDefaultPaymentMethod = async (paymentMethod: PaymentMethod) => {
+    try {
+      // Remove default from all methods
+      await supabase
+        .from('payment_methods')
+        .update({ is_default: false })
+        .eq('user_id', user?.id);
+
+      // Set new default
+      const { error } = await supabase
+        .from('payment_methods')
+        .update({ is_default: true })
+        .eq('id', paymentMethod.id);
+
+      if (error) throw error;
+
+      setPaymentMethods(prev =>
+        prev.map(pm => ({
+          ...pm,
+          is_default: pm.id === paymentMethod.id,
+        }))
+      );
+
+      await showToast('Método de pago predeterminado actualizado', 'success');
+    } catch (error: any) {
+      console.error('Error setting default payment method:', error);
+      await showErrorAlert('Error', 'No se pudo actualizar el método predeterminado');
+    }
+  };
+
+  const getCardBrandIcon = (brand: string) => {
+    const brandLower = brand.toLowerCase();
+    switch (brandLower) {
+      case 'visa':
+        return '💳';
+      case 'mastercard':
+        return '💳';
+      case 'amex':
+      case 'american_express':
+        return '💳';
+      default:
+        return '💳';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-16 bg-gray-200 rounded"></div>
+            <div className="h-16 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (paymentMethods.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+        <div className="text-center py-8">
+          <CreditCard className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            No tienes métodos de pago
+          </h3>
+          <p className="text-gray-600">
+            Agrega una tarjeta para comenzar a realizar compras
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-md border border-gray-200">
+      <div className="p-6 border-b border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900">
+          Métodos de Pago ({paymentMethods.length})
+        </h3>
+      </div>
+      
+      <div className="divide-y divide-gray-200">
+        {paymentMethods.map((paymentMethod) => (
+          <div key={paymentMethod.id} className="p-6 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="text-2xl">
+                {getCardBrandIcon(paymentMethod.card_brand)}
+              </div>
+              
+              <div>
+                <div className="flex items-center space-x-2">
+                  <p className="font-medium text-gray-900 capitalize">
+                    {paymentMethod.card_brand} •••• {paymentMethod.last4}
+                  </p>
+                  {paymentMethod.is_default && (
+                    <div className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                      <Star className="h-3 w-3 fill-current" />
+                      <span>Predeterminada</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600">
+                  Expira {paymentMethod.exp_month.toString().padStart(2, '0')}/{paymentMethod.exp_year}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              {!paymentMethod.is_default && (
+                <button
+                  onClick={() => handleSetDefaultPaymentMethod(paymentMethod)}
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  Hacer predeterminada
+                </button>
+              )}
+              
+              <button
+                onClick={() => handleDeletePaymentMethod(paymentMethod)}
+                className="text-red-600 hover:text-red-700 p-1"
+                title="Eliminar método de pago"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
