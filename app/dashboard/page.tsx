@@ -1,21 +1,26 @@
+'use client';
+
 import React from 'react';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { ChevronRight } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const courses = [
     { id: 1, name: 'Curso 1', price: '$10', progress: 2 },
     { id: 2, name: 'Curso 2', price: '$10', progress: 2 },
     { id: 3, name: 'Curso 3', price: '$10', progress: 2 },
   ];
 
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario';
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Welcome Section */}
         <div>
           <p className="text-gray-600 text-sm mb-1">Hola de nuevo</p>
-          <h1 className="text-2xl font-bold text-blue-500 uppercase">USUARIO</h1>
+          <h1 className="text-2xl font-bold text-blue-500 uppercase">{userName}</h1>
         </div>
 
         {/* Recent Courses Section */}
