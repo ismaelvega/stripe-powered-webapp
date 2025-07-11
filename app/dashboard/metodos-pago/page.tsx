@@ -5,6 +5,7 @@ import ProtectedRoute from '@/components/auth/protected-route';
 import Header from '@/components/layout/header';
 import PaymentMethodsList from '@/components/payment/payment-methods-list';
 import AddPaymentMethod from '@/components/payment/add-payment-method';
+import DashboardLayout from '@/components/layout/dashboard-layout';
 
 export default function MetodosPagoPage() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -15,8 +16,9 @@ export default function MetodosPagoPage() {
 
   return (
     <ProtectedRoute>
+      <DashboardLayout>
       <div className="min-h-screen bg-gray-50">
-        <Header />
+        {/* <Header /> */}
         <main className="container mx-auto px-4 py-8 max-w-4xl">
           <div className="space-y-6">
             <div>
@@ -34,6 +36,7 @@ export default function MetodosPagoPage() {
           </div>
         </main>
       </div>
+      </DashboardLayout>
     </ProtectedRoute>
   );
 }

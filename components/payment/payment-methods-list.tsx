@@ -31,8 +31,8 @@ export default function PaymentMethodsList() {
   }, [user]);
 
   const fetchPaymentMethods = async () => {
-    console.log('Current user:', user);
-    console.log('User ID:', user?.id);
+    // console.log('Current user:', user);
+    // console.log('User ID:', user?.id);
     
     try {
       const { data, error } = await supabase
@@ -49,7 +49,7 @@ export default function PaymentMethodsList() {
         throw error;
       }
 
-      console.log('Payment methods found:', data?.length || 0);
+    //   console.log('Payment methods found:', data?.length || 0);
       setPaymentMethods(data || []); // we store the fetched payment methods or an empty array if no results
     } catch (error: any) {
       console.error('Error fetching payment methods:', error);
@@ -60,6 +60,7 @@ export default function PaymentMethodsList() {
   };
 
   const handleUpdatePaymentMethod = async (paymentMethod: PaymentMethod) => {
+
     setUpdateMethod(paymentMethod);
   };
 
@@ -201,16 +202,16 @@ export default function PaymentMethodsList() {
               </div>
               
               <div>
-                <div className="flex items-center space-x-2">
-                  <p className="font-medium text-gray-900 capitalize">
-                    {paymentMethod.card_brand} •••• {paymentMethod.last4}
-                  </p>
                   {paymentMethod.is_default && (
                     <div className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
                       <Star className="h-3 w-3 fill-current" />
                       <span>Predeterminada</span>
                     </div>
                   )}
+                <div className="flex items-center space-x-2">
+                  <p className="font-medium text-gray-900 capitalize">
+                    {paymentMethod.card_brand} •••• {paymentMethod.last4}
+                  </p>
                 </div>
                 <p className="text-sm text-gray-600">
                   Expira {paymentMethod.exp_month.toString().padStart(2, '0')}/{paymentMethod.exp_year}
@@ -218,6 +219,7 @@ export default function PaymentMethodsList() {
               </div>
             </div>
 
+            {/* Set breakpoints for responsive design */}
             <div className="flex items-center space-x-2">
               {!paymentMethod.is_default && (
                 <button
