@@ -61,7 +61,10 @@ export default function PaymentMethodForm({ clientSecret, onSuccess, onCancel }:
         });
 
         if (!response.ok) {
-          throw new Error('Failed to save payment method');
+          const errorData = await response.json();
+          console.error('Error saving payment method:', errorData);
+          console.log(response);
+          throw new Error(errorData.error || 'Failed to save payment method');
         }
 
         onSuccess();

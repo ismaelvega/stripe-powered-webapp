@@ -43,6 +43,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get user's Stripe customer ID from profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', user_id)
+      .single();
+
+    if (profileError || !profile?.stripe_customer_id) {
+      return NextResponse.json(
+        { error: 'User profile or Stripe customer not found' },
+        { status: 400 }
+      );
+    }
+
+    // Check if payment method is already attached to this Stripe customer
+    const existingPaymentMethods = await stripe.paymentMethods.list({
+      customer: profile.stripe_customer_id,
+      type: 'card',
+    });
+
+    console.log('user payment methods:', existingPaymentMethods.data.map(pm => pm.card));
+    const isDuplicate = existingPaymentMethods.data.some(pm => 
+      pm.id === paymentMethodId || 
+      (pm.card?.last4 === paymentMethod.card?.last4 && 
+       pm.card?.brand === paymentMethod.card?.brand &&
+       pm.card?.exp_month === paymentMethod.card?.exp_month &&
+       pm.card?.exp_year === paymentMethod.card?.exp_year)
+    );
+
+    if (isDuplicate) {
+      return NextResponse.json(
+        { error: 'Payment method already exists for this customer' },
+        { status: 400 }
+      );
+    }
+
     // Check if this is the user's first payment method
     const { data: existingMethods } = await supabase
       .from('payment_methods')
