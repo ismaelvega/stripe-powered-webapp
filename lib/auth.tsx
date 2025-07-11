@@ -36,16 +36,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       setLoading(false);
 
-      // Send notification on sign in events (only once per session with time window)
+      // Send notification on sign in events (only for actual new logins)
       if (event === 'SIGNED_IN' && session?.user) {
         const now = Date.now();
         const currentToken = session.access_token;
         const lastNotification = lastNotificationRef.current;
         
-        // Check if this is a new session OR if enough time has passed (5 seconds)
-        const shouldSendNotification = !lastNotification || 
-          (lastNotification.token !== currentToken) ||
-          (now - lastNotification.timestamp > 5000);
+        // Only send notification if:
+        // 1. This is a completely new token (new session), AND
+        // 2. At least 30 seconds have passed since last notification (prevents session refreshes)
+        const isNewSession = !lastNotification || lastNotification.token !== currentToken;
+        const enoughTimePassed = !lastNotification || (now - lastNotification.timestamp > 30000); // 30 seconds
+        
+        const shouldSendNotification = isNewSession && enoughTimePassed;
         
         if (shouldSendNotification) {
           lastNotificationRef.current = { token: currentToken, timestamp: now };
@@ -68,9 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Failed to send login notification:', notificationError);
           }
         } else {
-          // Skip sending notification if it's a duplicate within the time window
-          console.log('Skipping duplicate notification for session:', currentToken.slice(-10), 
-            `(last sent ${Math.round((now - lastNotification.timestamp) / 1000)}s ago)`);
+          // Skip sending notification for session refresh/reload
+          console.log('Skipping notification - session refresh/reload for:', currentToken.slice(-10), 
+            `(last sent ${lastNotification ? Math.round((now - lastNotification.timestamp) / 1000) : 0}s ago)`);
         }
       }
     });
