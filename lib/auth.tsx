@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -17,6 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastNotificationRef = useRef<{ token: string; timestamp: number } | null>(null);
 
   useEffect(() => {
     // Get initial session
@@ -25,22 +26,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
+
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change detected:', event, session?.user?.email);
+      
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Send notification on sign in events (only once per session with time window)
+      if (event === 'SIGNED_IN' && session?.user) {
+        const now = Date.now();
+        const currentToken = session.access_token;
+        const lastNotification = lastNotificationRef.current;
+        
+        // Check if this is a new session OR if enough time has passed (5 seconds)
+        const shouldSendNotification = !lastNotification || 
+          (lastNotification.token !== currentToken) ||
+          (now - lastNotification.timestamp > 5000);
+        
+        if (shouldSendNotification) {
+          lastNotificationRef.current = { token: currentToken, timestamp: now };
+          
+          console.log('Sending login notification for session:', currentToken.slice(-10));
+          
+          try {
+            await fetch('/api/auth/login-notification', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userEmail: session.user.email,
+                userName: session.user.user_metadata?.full_name || session.user.email,
+                userAgent: navigator?.userAgent || 'Unknown',
+              }),
+            });
+          } catch (notificationError) {
+            console.error('Failed to send login notification:', notificationError);
+          }
+        } else {
+          // Skip sending notification if it's a duplicate within the time window
+          console.log('Skipping duplicate notification for session:', currentToken.slice(-10), 
+            `(last sent ${Math.round((now - lastNotification.timestamp) / 1000)}s ago)`);
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log('signIn function called');
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    console.log('signIn result:', { hasUser: !!data.user, hasError: !!error });
+
     return { error };
   };
 
