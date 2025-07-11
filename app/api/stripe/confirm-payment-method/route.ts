@@ -79,42 +79,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if this is the user's first payment method
-    const { data: existingMethods } = await supabase
-      .from('payment_methods')
-      .select('id')
-      .eq('user_id', user_id);
+    // Attach payment method to customer (if not already attached)
+    if (paymentMethod.customer !== profile.stripe_customer_id) {
+      await stripe.paymentMethods.attach(paymentMethodId, {
+        customer: profile.stripe_customer_id,
+      });
+      console.log('Payment method attached to customer:', profile.stripe_customer_id);
+    }
 
-    const isFirstMethod = !existingMethods || existingMethods.length === 0;
+    // Check if this should be the default payment method (if customer has no payment methods)
+    const customerPaymentMethods = await stripe.paymentMethods.list({
+      customer: profile.stripe_customer_id,
+      type: 'card',
+    });
 
-    // Save payment method to database
-    const { data, error } = await supabase
-      .from('payment_methods')
-      .insert({
-        user_id: user_id,
+    const isFirstMethod = customerPaymentMethods.data.length <= 1; // Including the one we just attached
+
+    // Set as default if it's the first payment method
+    if (isFirstMethod) {
+      await stripe.customers.update(profile.stripe_customer_id, {
+        invoice_settings: {
+          default_payment_method: paymentMethodId,
+        },
+      });
+      console.log('Set as default payment method:', paymentMethodId);
+    }
+
+    return NextResponse.json({
+      payment_method: {
+        id: paymentMethodId,
         stripe_payment_method_id: paymentMethodId,
         card_brand: paymentMethod.card.brand,
         last4: paymentMethod.card.last4,
         exp_month: paymentMethod.card.exp_month,
         exp_year: paymentMethod.card.exp_year,
-        is_default: isFirstMethod, // First method is default
-      })
-      .select()
-      .single();
-
-    console.log('Payment method saved:', data);
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json(
-        { error: 'Failed to save payment method' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      payment_method: data,
-      message: 'Payment method saved successfully',
+        is_default: isFirstMethod,
+      },
+      message: 'Payment method processed successfully',
     });
   } catch (error) {
     console.error('Error confirming payment method:', error);

@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Trash2, Star, Edit } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
 import { showErrorAlert, showToast, showConfirmDialog } from '@/lib/sweetalert';
 import UpdatePaymentMethod from './update-payment-method';
 
@@ -40,26 +39,18 @@ export default function PaymentMethodsList({ onEditingStateChange }: PaymentMeth
   }, [updateMethod, onEditingStateChange]);
 
   const fetchPaymentMethods = async () => {
-    // console.log('Current user:', user);
-    // console.log('User ID:', user?.id);
+    if (!user?.id) return;
     
     try {
-      const { data, error } = await supabase
-        .from('payment_methods')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      console.log('Supabase response:', { data, error });
-      console.log('Query executed with user_id:', user?.id);
-
-      if (error) {
-        console.error('Supabase error details:', error);
-        throw error;
+      const response = await fetch(`/api/stripe/list-payment-methods?user_id=${user.id}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch payment methods');
       }
 
-    //   console.log('Payment methods found:', data?.length || 0);
-      setPaymentMethods(data || []); // we store the fetched payment methods or an empty array if no results
+      const data = await response.json();
+      console.log('Payment methods from Stripe:', data.payment_methods);
+      setPaymentMethods(data.payment_methods || []);
     } catch (error: any) {
       console.error('Error fetching payment methods:', error);
       await showErrorAlert('Error', 'No se pudieron cargar los métodos de pago');
@@ -93,14 +84,25 @@ export default function PaymentMethodsList({ onEditingStateChange }: PaymentMeth
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase
-        .from('payment_methods')
-        .delete()
-        .eq('id', paymentMethod.id);
+      // Call API to detach from Stripe (no database involved)
+      const response = await fetch('/api/stripe/detach-payment-method', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          payment_method_id: paymentMethod.stripe_payment_method_id, // Use Stripe PM ID
+          user_id: user?.id,
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete payment method');
+      }
 
-      setPaymentMethods(prev => prev.filter(pm => pm.id !== paymentMethod.id));
+      // Refresh the list from Stripe
+      await fetchPaymentMethods();
       await showToast('Método de pago eliminado', 'success');
     } catch (error: any) {
       console.error('Error deleting payment method:', error);
@@ -110,27 +112,25 @@ export default function PaymentMethodsList({ onEditingStateChange }: PaymentMeth
 
   const handleSetDefaultPaymentMethod = async (paymentMethod: PaymentMethod) => {
     try {
-      // Remove default from all methods
-      await supabase
-        .from('payment_methods')
-        .update({ is_default: false })
-        .eq('user_id', user?.id);
+      // Call API to set default in Stripe
+      const response = await fetch('/api/stripe/set-default-payment-method', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          payment_method_id: paymentMethod.stripe_payment_method_id,
+          user_id: user?.id,
+        }),
+      });
 
-      // Set new default
-      const { error } = await supabase
-        .from('payment_methods')
-        .update({ is_default: true })
-        .eq('id', paymentMethod.id);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to set default payment method');
+      }
 
-      if (error) throw error;
-
-      setPaymentMethods(prev =>
-        prev.map(pm => ({
-          ...pm,
-          is_default: pm.id === paymentMethod.id,
-        }))
-      );
-
+      // Refresh the list from Stripe to get updated default status
+      await fetchPaymentMethods();
       await showToast('Método de pago predeterminado actualizado', 'success');
     } catch (error: any) {
       console.error('Error setting default payment method:', error);
