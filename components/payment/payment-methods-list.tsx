@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Trash2, Star } from 'lucide-react';
+import { CreditCard, Trash2, Star, Edit } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { showErrorAlert, showToast, showConfirmDialog } from '@/lib/sweetalert';
+import UpdatePaymentMethod from './update-payment-method';
 
 interface PaymentMethod {
   id: string;
@@ -21,6 +22,7 @@ export default function PaymentMethodsList() {
   const { user } = useAuth();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updateMethod, setUpdateMethod] = useState<PaymentMethod | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -29,7 +31,9 @@ export default function PaymentMethodsList() {
   }, [user]);
 
   const fetchPaymentMethods = async () => {
-    // console.log(user)
+    console.log('Current user:', user);
+    console.log('User ID:', user?.id);
+    
     try {
       const { data, error } = await supabase
         .from('payment_methods')
@@ -37,9 +41,15 @@ export default function PaymentMethodsList() {
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      console.log('Supabase response:', { data, error });
+      console.log('Query executed with user_id:', user?.id);
 
-    //   console.log('data', data);
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw error;
+      }
+
+      console.log('Payment methods found:', data?.length || 0);
       setPaymentMethods(data || []); // we store the fetched payment methods or an empty array if no results
     } catch (error: any) {
       console.error('Error fetching payment methods:', error);
@@ -47,6 +57,19 @@ export default function PaymentMethodsList() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpdatePaymentMethod = async (paymentMethod: PaymentMethod) => {
+    setUpdateMethod(paymentMethod);
+  };
+
+  const handleUpdateSuccess = () => {
+    setUpdateMethod(null);
+    fetchPaymentMethods(); // Refresh the list
+  };
+
+  const handleUpdateCancel = () => {
+    setUpdateMethod(null);
   };
 
   const handleDeletePaymentMethod = async (paymentMethod: PaymentMethod) => {
@@ -150,6 +173,17 @@ export default function PaymentMethodsList() {
     );
   }
 
+  // Show update form if a method is selected for update
+  if (updateMethod) {
+    return (
+      <UpdatePaymentMethod
+        paymentMethod={updateMethod}
+        onSuccess={handleUpdateSuccess}
+        onCancel={handleUpdateCancel}
+      />
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200">
       <div className="p-6 border-b border-gray-200">
@@ -193,7 +227,15 @@ export default function PaymentMethodsList() {
                   Hacer predeterminada
                 </button>
               )}
-              
+
+              <button
+                onClick={() => handleUpdatePaymentMethod(paymentMethod)}
+                className="text-gray-600 hover:text-gray-800 p-1"
+                title="Actualizar método de pago"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+
               <button
                 onClick={() => handleDeletePaymentMethod(paymentMethod)}
                 className="text-red-600 hover:text-red-700 p-1"
