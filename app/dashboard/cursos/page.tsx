@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import DashboardLayout from '@/components/layout/dashboard-layout';
+import Header from '@/components/layout/header';
 
 export default function CursosPage() {
   const [activeFilter, setActiveFilter] = useState<'completadas' | 'progreso' | null>(null);
@@ -21,10 +22,10 @@ export default function CursosPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Tus cursos</h1>
-        </div>
+          {/* Header */}
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Tus cursos</h1>
+          </div>
 
         {/* Filters */}
         <div className="flex gap-3">

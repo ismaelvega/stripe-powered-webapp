@@ -113,3 +113,33 @@ export const showToast = (title: string, icon: 'success' | 'error' | 'info' | 'w
 export const closeAlert = () => {
   Swal.close();
 };
+
+export const showConfirmDialog = async (
+  title: string,
+  text?: string,
+  confirmText?: string,
+  cancelText?: string
+): Promise<boolean> => {
+  const result = await Swal.fire({
+    title,
+    text,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: confirmText || 'Sí, eliminar',
+    cancelButtonText: cancelText || 'Cancelar',
+    confirmButtonColor: '#ef4444',
+    cancelButtonColor: '#6b7280',
+    customClass: {
+      ...customSwalClass,
+      confirmButton: `${customSwalClass.confirmButton} bg-red-600 hover:bg-red-700 focus:ring-red-500`,
+    },
+    buttonsStyling: false,
+  });
+
+  return result.isConfirmed;
+};
+
+// Overloaded function for backward compatibility
+export const showConfirmDialogSimple = async (title: string, text?: string): Promise<boolean> => {
+  return showConfirmDialog(title, text);
+};

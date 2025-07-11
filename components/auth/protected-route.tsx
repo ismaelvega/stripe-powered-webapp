@@ -13,6 +13,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
 
   useEffect(() => {
+    // if user is not authenticated and loading is complete, redirect to login
+    // this prevents redirecting to login while still loading auth state
     if (!loading && !user) {
       router.push('/auth');
     }
@@ -26,6 +28,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
+  // if user is not authenticated, show a message or redirect
+  // this is a fallback in case the useEffect doesn't redirect
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
