@@ -49,7 +49,7 @@ export default function PaymentMethodsList({ onEditingStateChange }: PaymentMeth
       }
 
       const data = await response.json();
-      console.log('Payment methods from Stripe:', data.payment_methods);
+      // console.log('Payment methods from Stripe:', data.payment_methods);
       setPaymentMethods(data.payment_methods || []);
     } catch (error: any) {
       console.error('Error fetching payment methods:', error);
@@ -83,6 +83,7 @@ export default function PaymentMethodsList({ onEditingStateChange }: PaymentMeth
 
     if (!confirmed) return;
 
+    setLoading(true); // Show spinner
     try {
       // Call API to detach from Stripe (no database involved)
       const response = await fetch('/api/stripe/detach-payment-method', {
@@ -107,6 +108,8 @@ export default function PaymentMethodsList({ onEditingStateChange }: PaymentMeth
     } catch (error: any) {
       console.error('Error deleting payment method:', error);
       await showErrorAlert('Error', 'No se pudo eliminar el método de pago');
+    } finally {
+      setLoading(false); // Hide spinner
     }
   };
 
@@ -155,14 +158,12 @@ export default function PaymentMethodsList({ onEditingStateChange }: PaymentMeth
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="space-y-3">
-            <div className="h-16 bg-gray-200 rounded"></div>
-            <div className="h-16 bg-gray-200 rounded"></div>
-          </div>
-        </div>
+      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 flex flex-col items-center justify-center">
+        <svg className="animate-spin h-8 w-8 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+        </svg>
+        <div className="text-gray-700 text-lg font-medium">Procesando...</div>
       </div>
     );
   }
