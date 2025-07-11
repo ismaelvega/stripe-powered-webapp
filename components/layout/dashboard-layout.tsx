@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './sidebar';
 import Header from './header';
-import DemoControls from '@/components/ui/demo-controls';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -50,8 +49,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </main>
         </div>
       </div>
-      
-      <DemoControls />
     </div>
   );
 }

@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
-import { showErrorAlert } from '@/lib/sweetalert';
+import { showErrorAlert, showToast } from '@/lib/sweetalert';
 
 interface PaymentMethod {
   id: string;
@@ -64,49 +63,44 @@ export default function UpdatePaymentMethodForm({
       }
 
       if (setupIntent?.status === 'succeeded') {
-        // Get the new payment method details from Stripe
-        const newPaymentMethodId = setupIntent.payment_method as string;
-        
-        // We need to call our API to get payment method details since client-side Stripe
-        // doesn't have access to retrieve payment method details
-        const response = await fetch('/api/stripe/get-payment-method', {
+        // First, confirm and attach the new payment method via our Stripe-only API
+        const confirmResponse = await fetch('/api/stripe/confirm-payment-method', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            payment_method_id: newPaymentMethodId,
+            setup_intent_id: setupIntent.id,
+            user_id: user.id,
           }),
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to retrieve payment method details');
+        if (!confirmResponse.ok) {
+          const errorData = await confirmResponse.json();
+          throw new Error(errorData.error || 'Failed to confirm new payment method');
         }
 
-        const { paymentMethod: paymentMethodDetails } = await response.json();
+        const { payment_method: newPaymentMethodData } = await confirmResponse.json();
 
-        if (paymentMethodDetails.type !== 'card' || !paymentMethodDetails.card) {
-          throw new Error('Only card payment methods are supported');
+        // If the old payment method is different, detach it from Stripe
+        if (paymentMethod.stripe_payment_method_id !== newPaymentMethodData.stripe_payment_method_id) {
+          const detachResponse = await fetch('/api/stripe/detach-payment-method', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              payment_method_id: paymentMethod.stripe_payment_method_id,
+              user_id: user.id,
+            }),
+          });
+
+          if (!detachResponse.ok) {
+            console.warn('Failed to detach old payment method, but new one was attached successfully');
+          }
         }
 
-        // Update the payment method in our database
-        const { error: updateError } = await supabase
-          .from('payment_methods')
-          .update({
-            stripe_payment_method_id: newPaymentMethodId,
-            card_brand: paymentMethodDetails.card.brand,
-            last4: paymentMethodDetails.card.last4,
-            exp_month: paymentMethodDetails.card.exp_month,
-            exp_year: paymentMethodDetails.card.exp_year,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', paymentMethod.id);
-
-        if (updateError) {
-          throw new Error('Failed to update payment method in database');
-        }
-
-        console.log('Payment method updated successfully in database');
+        await showToast('Método de pago actualizado exitosamente', 'success');
         onSuccess();
       }
     } catch (error: any) {
@@ -123,16 +117,23 @@ export default function UpdatePaymentMethodForm({
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
           Actualizar Método de Pago
         </h3>
-        <div className="bg-gray-50 p-3 rounded-md mb-4">
-          <p className="text-sm text-gray-600">
-            <strong>Método actual:</strong> {paymentMethod.card_brand.toUpperCase()} •••• {paymentMethod.last4}
-          </p>
-          <p className="text-sm text-gray-600">
-            Expira: {paymentMethod.exp_month.toString().padStart(2, '0')}/{paymentMethod.exp_year}
-          </p>
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md mb-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <div className="text-2xl">💳</div>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-blue-800">
+                Método actual: {paymentMethod.card_brand.toUpperCase()} •••• {paymentMethod.last4}
+              </p>
+              <p className="text-sm text-blue-700">
+                Expira: {paymentMethod.exp_month.toString().padStart(2, '0')}/{paymentMethod.exp_year}
+              </p>
+            </div>
+          </div>
         </div>
         <p className="text-gray-600 text-sm">
-          Ingresa la información de tu nueva tarjeta. La anterior será reemplazada.
+          Ingresa la información de tu nueva tarjeta. La anterior será automáticamente reemplazada.
         </p>
       </div>
 

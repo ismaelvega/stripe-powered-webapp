@@ -114,6 +114,7 @@ export default function PaymentMethodsList({ onEditingStateChange }: PaymentMeth
   };
 
   const handleSetDefaultPaymentMethod = async (paymentMethod: PaymentMethod) => {
+    setLoading(true); // show spinner while setting default
     try {
       // Call API to set default in Stripe
       const response = await fetch('/api/stripe/set-default-payment-method', {
@@ -138,6 +139,8 @@ export default function PaymentMethodsList({ onEditingStateChange }: PaymentMeth
     } catch (error: any) {
       console.error('Error setting default payment method:', error);
       await showErrorAlert('Error', 'No se pudo actualizar el método predeterminado');
+    } finally {
+      setLoading(false); // hide spinner
     }
   };
 
