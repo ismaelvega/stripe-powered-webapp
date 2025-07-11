@@ -9,9 +9,14 @@ import DashboardLayout from '@/components/layout/dashboard-layout';
 
 export default function MetodosPagoPage() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
 
   const handlePaymentMethodAdded = () => {
     setRefreshKey(prev => prev + 1);
+  };
+
+  const handleEditingStateChange = (editing: boolean) => {
+    setIsEditing(editing);
   };
 
   return (
@@ -30,9 +35,14 @@ export default function MetodosPagoPage() {
               </p>
             </div>
             
-            <AddPaymentMethod onPaymentMethodAdded={handlePaymentMethodAdded} />
+            {!isEditing && (
+              <AddPaymentMethod onPaymentMethodAdded={handlePaymentMethodAdded} />
+            )}
             
-            <PaymentMethodsList key={refreshKey} />
+            <PaymentMethodsList 
+              key={refreshKey} 
+              onEditingStateChange={handleEditingStateChange}
+            />
           </div>
         </main>
       </div>

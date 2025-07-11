@@ -18,7 +18,11 @@ interface PaymentMethod {
   created_at: string;
 }
 
-export default function PaymentMethodsList() {
+interface PaymentMethodsListProps {
+  onEditingStateChange?: (isEditing: boolean) => void;
+}
+
+export default function PaymentMethodsList({ onEditingStateChange }: PaymentMethodsListProps) {
   const { user } = useAuth();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +33,11 @@ export default function PaymentMethodsList() {
       fetchPaymentMethods();
     }
   }, [user]);
+
+  // Notify parent when editing state changes
+  useEffect(() => {
+    onEditingStateChange?.(updateMethod !== null);
+  }, [updateMethod, onEditingStateChange]);
 
   const fetchPaymentMethods = async () => {
     // console.log('Current user:', user);
