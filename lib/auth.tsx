@@ -18,6 +18,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const lastNotificationRef = useRef<{ token: string; timestamp: number } | null>(null);
+  const recentSignupRef = useRef<{ email: string; timestamp: number } | null>(null);
 
   useEffect(() => {
     // Get initial session
@@ -41,14 +42,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const now = Date.now();
         const currentToken = session.access_token;
         const lastNotification = lastNotificationRef.current;
+        const recentSignup = recentSignupRef.current;
+        
+        // Check if this SIGNED_IN event is from a recent signup (within 10 seconds)
+        const isFromRecentSignup = recentSignup && 
+          recentSignup.email === session.user.email && 
+          (now - recentSignup.timestamp < 10000); // 10 seconds
         
         // Only send notification if:
-        // 1. This is a completely new token (new session), AND
-        // 2. At least 30 seconds have passed since last notification (prevents session refreshes)
+        // 1. This is NOT from a recent signup (welcome email already sent)
+        // 2. This is a completely new token (new session), AND
+        // 3. At least 30 seconds have passed since last notification (prevents session refreshes)
         const isNewSession = !lastNotification || lastNotification.token !== currentToken;
         const enoughTimePassed = !lastNotification || (now - lastNotification.timestamp > 30000); // 30 seconds
         
-        const shouldSendNotification = isNewSession && enoughTimePassed;
+        const shouldSendNotification = !isFromRecentSignup && isNewSession && enoughTimePassed;
         
         if (shouldSendNotification) {
           lastNotificationRef.current = { token: currentToken, timestamp: now };
@@ -71,8 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Failed to send login notification:', notificationError);
           }
         } else {
-          // Skip sending notification for session refresh/reload
-          console.log('Skipping notification - session refresh/reload for:', currentToken.slice(-10), 
+          // Skip sending notification 
+          const reason = isFromRecentSignup ? 'recent signup (welcome email sent)' : 'session refresh/reload';
+          console.log(`Skipping notification - ${reason} for:`, currentToken.slice(-10), 
             `(last sent ${lastNotification ? Math.round((now - lastNotification.timestamp) / 1000) : 0}s ago)`);
         }
       }
@@ -95,6 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
+    // Track this signup to prevent duplicate notifications
+    recentSignupRef.current = { email, timestamp: Date.now() };
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -147,6 +159,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Error creating profile:', profileError);
         // Same as above - user exists but profile creation failed
       }
+    }
+
+    // Clear signup tracking if signup failed
+    if (error) {
+      recentSignupRef.current = null;
     }
 
     return { error };
