@@ -124,6 +124,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('Failed to create user profile');
           // Note: User is already created in Supabase Auth, 
           // but profile creation failed. This should be handled by support.
+        } else {
+          // Send welcome email notification via N8N
+          try {
+            await fetch('/api/auth/signup-notification', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userEmail: data.user.email,
+                userName: fullName,
+                signupTime: new Date().toISOString(),
+                userAgent: navigator?.userAgent || 'Unknown',
+              }),
+            });
+          } catch (notificationError) {
+            console.error('Failed to send signup notification:', notificationError);
+          }
         }
       } catch (profileError) {
         console.error('Error creating profile:', profileError);
